@@ -1,3 +1,4 @@
+import argparse
 import os
 import typing
 from datetime import datetime
@@ -106,22 +107,52 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
     callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
 
 
-MIN_CONFIDENCE: typing.Final[float] = 0.2
-MIN_IOU_THRESHOLD: typing.Final[float] = 0.2
-BATCH_SIZE: typing.Final[int] = 1
+parser = argparse.ArgumentParser(
+    prog='RetinaNet_Trainer',
+    description='The aim of this program is to train RetinaNet model with custom dataset',
+    epilog='------- SGS France - Operational Innovation -------')
 
-IMAGE_SIZE: typing.Final[tuple[int, int]] = (128, 128)
+parser.add_argument('-epoch', '--epoch', type=int, default=100, required=False,
+                    help='Number of epochs used for train the model')
+parser.add_argument('-bs', '--batch_size', type=int, default=2, required=False,
+                    help='Batch size during the training')
+parser.add_argument('-device', '--device', type=str, default="cuda", required=False,
+                    help='Device used to train the model')
+parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, required=False,
+                    help='Learning rate used for training')
+parser.add_argument('-env', '--path_env_file', type=str, required=True,
+                    help='Path of .env file necessary to get Picsellia credentials')
+parser.add_argument('-tds', '--train_dataset', type=str, required=True,
+                    help='Path of training PASCAL_VOC dataset folder')
+parser.add_argument('-vds', '--valid_dataset', type=str, required=True,
+                    help='Path of validation PASCAL_VOC dataset folder')
+parser.add_argument('-imgsz', '--image_size', nargs='+', type=int,
+                    help='Training image size')
+parser.add_argument("-sglcls", "--single_class", default=False, action="store_true", required=False,
+                    help="Use only one class")
+parser.add_argument('-conf', '--confidence_threshold', type=float, default=0.2, required=False,
+                    help='Confidence threshold used to evaluate model')
+parser.add_argument('-iou', '--iou_threshold', type=float, default=0.2, required=False,
+                    help='IoU threshold used to evaluate model when NMS is applied')
 
-DATA_TRAIN_DIR: typing.Final[str] = r"C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\dataset\train"
-DATA_VALIDATION_DIR: typing.Final[str] = r"C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\dataset\test"
+args = parser.parse_args()
 
-LEARNING_RATE: typing.Final[float] = 0.001
-NB_EPOCHS: typing.Final[int] = 20
-NB_CLASSES: typing.Final[int] = 1
+MIN_CONFIDENCE: typing.Final[float] = args.confidence_threshold
+MIN_IOU_THRESHOLD: typing.Final[float] = args.iou_threshold
+BATCH_SIZE: typing.Final[int] = args.batch_size
 
-SINGLE_CLS: typing.Final[bool] = True
+# noinspection PyTypeChecker
+IMAGE_SIZE: typing.Final[tuple[int, int]] = tuple(args.image_size)
 
-PATH_ENV_FILE: typing.Final[str] = r"C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\.env"
+DATA_TRAIN_DIR: typing.Final[str] = args.train_dataset
+DATA_VALIDATION_DIR: typing.Final[str] = args.valid_dataset
+
+LEARNING_RATE: typing.Final[float] = args.learning_rate
+NB_EPOCHS: typing.Final[int] = args.epoch
+
+SINGLE_CLS: typing.Final[bool] = args.single_class
+
+PATH_ENV_FILE: typing.Final[str] = args.path_env_file
 
 if __name__ == "__main__":
     date_time = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
@@ -169,7 +200,10 @@ if __name__ == "__main__":
         collate_fn=collate_fn
     )
 
-    model = create_retinanet_model(num_classes=NB_CLASSES)
+    # TODO concatenate class mappings of train and test datasets
+    class_mapping = train_dataset.class_mapping
+
+    model = create_retinanet_model(num_classes=len(class_mapping))
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -192,12 +226,11 @@ if __name__ == "__main__":
         'image_size': IMAGE_SIZE,
         'learning_rate': LEARNING_RATE,
         'num_epochs': NB_EPOCHS,
-        'nb_classes': NB_CLASSES,
+        'nb_classes': len(class_mapping),
         'single_class': SINGLE_CLS
     }
 
-    # TODO concatenate class mappings of train and test datasets
-    picsellia_logger.on_train_begin(params=params, class_mapping=train_dataset.class_mapping)
+    picsellia_logger.on_train_begin(params=params, class_mapping=class_mapping)
 
     train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, NB_EPOCHS, PATH_SAVED_MODELS,
                 callback=picsellia_logger)

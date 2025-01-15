@@ -41,10 +41,10 @@ class PicselliaLogger:
 
     def on_epoch_end(self, losses: dict, accuracies: dict):
         for key, value in losses.items():
-            self._experiment.log(name=f'Training {key}', type=LogType.LINE, value=value)
+            self._experiment.log(name=f'Training {key}', type=LogType.LINE, data=value)
 
         for key, value in accuracies.items():
-            self._experiment.log(name=f'Validation {key}', type=LogType.LINE, value=value)
+            self._experiment.log(name=f'Validation {key}', type=LogType.LINE, data=value)
 
     def on_train_end(self, best_validation_map: float, path_saved_models: str):
         self._experiment.log(name="Best Validation Map", type=LogType.VALUE, value=best_validation_map)
