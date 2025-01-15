@@ -1,4 +1,5 @@
 import torch
+from torchvision.ops import nms
 
 
 def get_CUDA_memory_allocation():
@@ -32,7 +33,7 @@ class UnNormalize(object):
         return tensor
 
 
-class Averager:      ##Return the average loss
+class Averager:  ##Return the average loss
     def __init__(self):
         self.current_losses = {
             "regression": 0.0,
@@ -68,3 +69,31 @@ class Averager:      ##Return the average loss
             "total": 0.0
         }
         self.iterations = 0.0
+
+
+def filter_predictions_by_confidence_threshold(predictions: dict, confidence_threshold: float):
+    filter_by_confidence = predictions['scores'] > confidence_threshold
+    for k, v in predictions.items():
+        predictions[k] = predictions[k][filter_by_confidence]
+    return predictions
+
+
+def apply_nms_on_predictions(predictions: dict, iou_threshold: float):
+    kept_bboxes = nms(boxes=predictions['boxes'], scores=predictions['scores'], iou_threshold=iou_threshold)
+
+    for k, v in predictions.items():
+        if predictions[k].size()[0] != 0:
+            predictions[k] = torch.stack([predictions[k][i] for i in kept_bboxes.tolist()])
+    # predictions['labels'] = predictions['labels'].type(torch.int64)
+    return predictions
+
+
+def apply_postprocess_on_predictions(predictions: list[dict], iou_threshold: float, confidence_threshold: float):
+    post_processed_predictions = []
+    for one_picture_prediction in predictions:
+        one_picture_prediction = filter_predictions_by_confidence_threshold(predictions=one_picture_prediction,
+                                                                            confidence_threshold=confidence_threshold)
+        one_picture_prediction = apply_nms_on_predictions(predictions=one_picture_prediction,
+                                                          iou_threshold=iou_threshold)
+        post_processed_predictions.append(one_picture_prediction)
+    return predictions

@@ -1,21 +1,16 @@
 import os
 from functools import partial
 
+import albumentations as A
 import torch
 import torchvision
 from albumentations.pytorch import ToTensorV2
-from keras_cv.src.models.object_detection.yolo_v8.yolo_v8_detector import decode_regression_to_boxes
 from torchvision.models.detection import RetinaNet_ResNet50_FPN_V2_Weights
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.retinanet import RetinaNetClassificationHead
 
 from src.torch_implementation.dataset import PascalVOCDataset
-import albumentations as A
-
-os.environ["KERAS_BACKEND"] = "torch"
-
 import json
-import keras_cv
 
 
 def create_retinanet_model(num_classes=91):

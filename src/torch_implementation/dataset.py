@@ -158,19 +158,3 @@ class PascalVOCDataset(Dataset):
         images = torch.stack(images, dim=0)
 
         return images, boxes, labels
-
-
-if __name__ == "__main__":
-    transform = A.Compose([
-        A.RandomCrop(width=1500, height=1500),
-        A.HorizontalFlip(p=0.5),
-        A.RandomBrightnessContrast(p=0.2),
-        ToTensorV2()
-    ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
-
-    train_dataset = PascalVOCDataset(
-        data_folder=r"C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\dataset_pascal_voc\Evry_dataset_2024_pascal_voc\VOCdevkit\VOC",
-        split='train',
-        transform=transform)
-
-    print(train_dataset[0])

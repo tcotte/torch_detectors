@@ -10,10 +10,9 @@ from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
 
 from src.torch_implementation.dataset import PascalVOCDataset
-from src.torch_implementation.detect import apply_postprocess_on_predictions
 from src.torch_implementation.loggers.picsellia_logger import PicselliaLogger
 from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
-from src.torch_implementation.utils import Averager
+from src.torch_implementation.utils import Averager, apply_postprocess_on_predictions
 
 
 def train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, nb_epochs, path_saved_models: str,

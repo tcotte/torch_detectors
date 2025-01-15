@@ -1,5 +1,3 @@
-import json
-import os
 import time
 
 import albumentations as A
@@ -8,52 +6,16 @@ import matplotlib.pyplot as plt
 import torch
 from albumentations.pytorch import ToTensorV2
 from torchmetrics.detection import MeanAveragePrecision
-from torchvision.ops import nms
 
 from src.torch_implementation.dataset import PascalVOCDataset
 from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
-from src.torch_implementation.utils import UnNormalize
-
-
-def filter_predictions_by_confidence_threshold(predictions: dict, confidence_threshold: float):
-    filter_by_confidence = predictions['scores'] > confidence_threshold
-    for k, v in predictions.items():
-        predictions[k] = predictions[k][filter_by_confidence]
-    return predictions
-
-
-def apply_nms_on_predictions(predictions: dict, iou_threshold: float):
-    kept_bboxes = nms(boxes=predictions['boxes'], scores=predictions['scores'], iou_threshold=iou_threshold)
-
-    for k, v in predictions.items():
-        if predictions[k].size()[0] != 0:
-            predictions[k] = torch.stack([predictions[k][i] for i in kept_bboxes.tolist()])
-    # predictions['labels'] = predictions['labels'].type(torch.int64)
-    return predictions
-
-
-def apply_postprocess_on_predictions(predictions: list[dict], iou_threshold: float, confidence_threshold: float):
-    post_processed_predictions = []
-    for one_picture_prediction in predictions:
-        one_picture_prediction = filter_predictions_by_confidence_threshold(predictions=one_picture_prediction,
-                                                                            confidence_threshold=confidence_threshold)
-        one_picture_prediction = apply_nms_on_predictions(predictions=one_picture_prediction,
-                                                          iou_threshold=iou_threshold)
-        post_processed_predictions.append(one_picture_prediction)
-    return predictions
-
+from src.torch_implementation.utils import UnNormalize, apply_postprocess_on_predictions
 
 class_mapping = {
     0: 'person'
 }
 
 IMAGE_SIZE = (512, 512)
-
-xs_configuration_yolo_folder = r'C:\Users\tristan_cotte\Downloads\yolov8-keras-yolo_v8_xs_backbone_coco-v2.tar\yolov8-keras-yolo_v8_xs_backbone_coco-v2'
-config_file = os.path.join(xs_configuration_yolo_folder, 'config.json')
-
-with open(config_file, 'r') as JSON:
-    json_dict = json.load(JSON)
 
 # yolo.to('cuda')
 
@@ -66,7 +28,7 @@ transform = A.Compose([
 ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
 
 train_dataset = PascalVOCDataset(
-    data_folder=r"C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\dataset_pascal_voc\Evry_dataset_2024_pascal_voc\VOCdevkit\VOC",
+    data_folder=r"Evry_dataset_2024_pascal_voc\VOCdevkit\VOC",
     split='train',
     single_cls=True,
     transform=transform)
