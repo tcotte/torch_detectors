@@ -1,0 +1,13 @@
+.env
+import_annotation_files.py
+__pycache__/
+tensor_try.py
+.venv/
+certificates/
+dataset/
+dataset_pascal_voc/
+experiment/
+models/
+notebooks/
+src/torch_implementation/models/
+.idea/
