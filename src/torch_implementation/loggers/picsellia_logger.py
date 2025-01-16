@@ -1,4 +1,5 @@
 import os
+import uuid
 
 from dotenv import load_dotenv
 from picsellia import Client
@@ -10,13 +11,27 @@ class PicselliaLogger:
         self._path_env_file = path_env_file
         self._experiment = self.get_picsellia_experiment()
 
+    def get_picsellia_experiment_link(self):
+        client_id = self._client.id
+        project_id = self.get_project_id_from_experiment()
+        experiment_id = os.getenv('EXPERIMENT_ID')
+
+        link = f'https://app.picsellia.com/{str(client_id)}/project/{str(project_id)}/experiment/{experiment_id}'
+        return link
+
+    def get_project_id_from_experiment(self) -> uuid.UUID:
+        for project in self._client.list_projects():
+            for experiment in project.list_experiments():
+                if str(experiment.id) == os.getenv('EXPERIMENT_ID'):
+                    return project.id
+
     def get_picsellia_experiment(self):
         load_dotenv(self._path_env_file)
 
         PICSELLIA_TOKEN = os.getenv('PICSELLIA_TOKEN')
-        client = Client(PICSELLIA_TOKEN, organization_name=os.getenv('ORGANIZATION_NAME'))
+        self._client = Client(PICSELLIA_TOKEN, organization_name=os.getenv('ORGANIZATION_NAME'))
 
-        picsellia_experiment = client.get_experiment_by_id(os.getenv('EXPERIMENT_ID'))
+        picsellia_experiment = self._client.get_experiment_by_id(os.getenv('EXPERIMENT_ID'))
 
         picsellia_experiment.delete_all_logs()
         picsellia_experiment.delete_all_artifacts()
@@ -34,7 +49,10 @@ class PicselliaLogger:
     def on_train_begin(self, params, class_mapping):
         self._experiment.log(name='Parameters', type=LogType.TABLE, data=params)
         self._experiment.log(name='LabelMap', type=LogType.TABLE,
-                                 data={str(key): value for key, value in class_mapping.items()})
+                             data={str(key): value for key, value in class_mapping.items()})
+
+        print(f"Successfully logged to Picsellia\n You can follow experiment here: "
+              f"{self.get_picsellia_experiment_link()} ")
 
     #     if self._config_file is not None:
     #         self._picsellia_experiment.store('config', self._config_file)
@@ -50,13 +68,11 @@ class PicselliaLogger:
 
     def on_train_end(self, best_validation_map: float, path_saved_models: str):
         self._experiment.log(name="Best Validation Map", type=LogType.VALUE, data=best_validation_map)
-        self.store_model(model_path=os.path.join(path_saved_models, 'best.pth'), model_name='best')
-        self.store_model(model_path=os.path.join(path_saved_models, 'latest.pth'), model_name='latest')
+        self.store_model(model_path=os.path.join(path_saved_models, 'best.pth'), model_name='model-best')
+        self.store_model(model_path=os.path.join(path_saved_models, 'latest.pth'), model_name='model-latest')
 
     def store_model(self, model_path: str, model_name: str) -> None:
-        self._experiment.create_artifact(
-            name=model_name, filename=model_path, object_name=os.path.basename(model_path), large=True
-        )
+        self._experiment.store(model_name, model_path, do_zip=True)
 
     # def on_train_end(self, logs=None):
     #     self._picsellia_experiment.log(name="Best Validation Map", type=LogType.VALUE, value=self.best_map)
@@ -69,3 +85,8 @@ class PicselliaLogger:
     #     self._picsellia_experiment.create_artifact(
     #         name="model_latest", filename=latest_model_path, object_name=latest_model_object_name, large=True
     #     )
+
+
+if __name__ == '__main__':
+    pl = PicselliaLogger(path_env_file=r'C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\.env')
+    print(pl.get_picsellia_experiment_link())

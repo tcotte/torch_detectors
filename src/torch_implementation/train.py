@@ -204,7 +204,7 @@ if __name__ == "__main__":
 
     val_data_loader = torch.utils.data.DataLoader(
         val_dataset,
-        num_workers=args.num_wrokers,
+        num_workers=args.num_workers,
         batch_size=BATCH_SIZE,
         shuffle=False,
         collate_fn=collate_fn
@@ -245,7 +245,8 @@ if __name__ == "__main__":
         'single_class': SINGLE_CLS,
         'optimizer': args.optimizer,
         'weight_decay': args.weight_decay,
-        'pretrained_weights': args.pretrained_weights
+        'pretrained_weights': args.pretrained_weights,
+        'num_workers': args.num_workers
     }
 
     picsellia_logger.on_train_begin(params=params, class_mapping=class_mapping)
