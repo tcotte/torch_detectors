@@ -130,6 +130,8 @@ parser.add_argument('-tds', '--train_dataset', type=str, required=True,
                     help='Path of training PASCAL_VOC dataset folder')
 parser.add_argument('-vds', '--valid_dataset', type=str, required=True,
                     help='Path of validation PASCAL_VOC dataset folder')
+parser.add_argument('-numw', '--num_workers', type=int, default=8, required=False,
+                    help='Number of workers to retrieve data during training')
 parser.add_argument('-imgsz', '--image_size', nargs='+', type=int,
                     help='Training image size')
 parser.add_argument("-sglcls", "--single_class", default=False, action="store_true", required=False,
@@ -194,6 +196,7 @@ if __name__ == "__main__":
 
     train_data_loader = torch.utils.data.DataLoader(
         train_dataset,
+        num_workers=args.num_workers,
         batch_size=BATCH_SIZE,
         shuffle=True,
         collate_fn=collate_fn
@@ -201,6 +204,7 @@ if __name__ == "__main__":
 
     val_data_loader = torch.utils.data.DataLoader(
         val_dataset,
+        num_workers=args.num_wrokers,
         batch_size=BATCH_SIZE,
         shuffle=False,
         collate_fn=collate_fn
