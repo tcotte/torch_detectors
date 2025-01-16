@@ -13,9 +13,14 @@ from src.torch_implementation.dataset import PascalVOCDataset
 import json
 
 
-def create_retinanet_model(num_classes=91):
+def create_retinanet_model(num_classes=91, use_pretrained_weights: bool=True):
+    if use_pretrained_weights:
+        weights = RetinaNet_ResNet50_FPN_V2_Weights.COCO_V1
+    else:
+        weights = None
+
     model = torchvision.models.detection.retinanet_resnet50_fpn_v2(
-        weights=RetinaNet_ResNet50_FPN_V2_Weights.COCO_V1
+        weights=weights
     )
     num_anchors = model.head.classification_head.num_anchors
     model.head.classification_head = RetinaNetClassificationHead(

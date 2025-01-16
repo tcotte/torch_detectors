@@ -47,7 +47,7 @@ class PicselliaLogger:
             self._experiment.log(name=f'Validation {key}', type=LogType.LINE, data=value)
 
     def on_train_end(self, best_validation_map: float, path_saved_models: str):
-        self._experiment.log(name="Best Validation Map", type=LogType.VALUE, value=best_validation_map)
+        self._experiment.log(name="Best Validation Map", type=LogType.VALUE, data=best_validation_map)
         self.store_model(model_path=os.path.join(path_saved_models, 'best.pth'), model_name='best')
         self.store_model(model_path=os.path.join(path_saved_models, 'latest.pth'), model_name='latest')
 

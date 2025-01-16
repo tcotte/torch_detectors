@@ -28,7 +28,7 @@ transform = A.Compose([
 ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
 
 train_dataset = PascalVOCDataset(
-    data_folder=r"Evry_dataset_2024_pascal_voc\VOCdevkit\VOC",
+    data_folder=r"../../dataset_pascal_voc/Evry_dataset_2024_pascal_voc\VOCdevkit\VOC",
     split='train',
     single_cls=True,
     transform=transform)
@@ -53,7 +53,7 @@ model.eval()
 
 if __name__ == "__main__":
     MIN_CONFIDENCE = 0.1
-    MIN_IOU_THRESHOLD = 0.3
+    MIN_IOU_THRESHOLD = 0.1
 
     unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     metric = MeanAveragePrecision(iou_type="bbox")

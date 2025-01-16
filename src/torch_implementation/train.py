@@ -90,7 +90,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
               f"- Accuracies: 'mAP' {float(validation_metrics['map']):.3} / "
               f"'mAP[50]': {float(validation_metrics['map_50']):.3} / "
               f"'mAP[75]': {float(validation_metrics['map_75']):.3}")
-        if validation_metrics['map'] > best_map:
+        if validation_metrics['map'] >= best_map:
             best_map = validation_metrics['map']
             torch.save(model.state_dict(), os.path.join(path_saved_models, 'best.pth'))
 
@@ -105,7 +105,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
     torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
     callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
 
-
+# todo:  add possibility to add path to models - add several workers to load data
 parser = argparse.ArgumentParser(
     prog='RetinaNet_Trainer',
     description='The aim of this program is to train RetinaNet model with custom dataset',
@@ -119,8 +119,12 @@ parser.add_argument('-device', '--device', type=str, default="cuda", required=Fa
                     help='Device used to train the model')
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, required=False,
                     help='Learning rate used for training')
+parser.add_argument('-wd', '--weight_decay', type=float, default=0.0005, required=False,
+                    help='Weight decay used for training')
 parser.add_argument('-env', '--path_env_file', type=str, required=True,
                     help='Path of .env file necessary to get Picsellia credentials')
+parser.add_argument('-opt', '--optimizer', type=str, default='Adam',
+                    help='Optimizer used for training')
 parser.add_argument('-tds', '--train_dataset', type=str, required=True,
                     help='Path of training PASCAL_VOC dataset folder')
 parser.add_argument('-vds', '--valid_dataset', type=str, required=True,
@@ -129,6 +133,8 @@ parser.add_argument('-imgsz', '--image_size', nargs='+', type=int,
                     help='Training image size')
 parser.add_argument("-sglcls", "--single_class", default=False, action="store_true", required=False,
                     help="Use only one class")
+parser.add_argument("--pretrained_weights", default=False, action="store_true", required=False,
+                    help="Load model with pretrained weights from COCO dataset")
 parser.add_argument('-conf', '--confidence_threshold', type=float, default=0.2, required=False,
                     help='Confidence threshold used to evaluate model')
 parser.add_argument('-iou', '--iou_threshold', type=float, default=0.2, required=False,
@@ -202,18 +208,23 @@ if __name__ == "__main__":
     # TODO concatenate class mappings of train and test datasets
     class_mapping = train_dataset.class_mapping
 
-    model = create_retinanet_model(num_classes=len(class_mapping))
+    model = create_retinanet_model(num_classes=len(class_mapping), use_pretrained_weights=args.pretrained_weights)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     model.to(device)
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+    if args.optimizer.lower() == 'sgd':
+        optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=args.weight_decay)
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=args.weight_decay)
+
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
 
     picsellia_logger = PicselliaLogger(path_env_file=PATH_ENV_FILE)
     picsellia_logger.log_split_table(
-        annotations_in_split={"train": len(train_data_loader), "val": len(val_data_loader)},
+        annotations_in_split={"train": len(train_dataset), "val": len(val_dataset)},
         title="Nb elem / split")
     picsellia_logger.log_split_table(annotations_in_split=train_dataset.number_obj_by_cls, title="Train split")
     picsellia_logger.log_split_table(annotations_in_split=val_dataset.number_obj_by_cls, title="Val split")
@@ -226,7 +237,9 @@ if __name__ == "__main__":
         'learning_rate': LEARNING_RATE,
         'num_epochs': NB_EPOCHS,
         'nb_classes': len(class_mapping),
-        'single_class': SINGLE_CLS
+        'single_class': SINGLE_CLS,
+        'optimizer': args.optimizer,
+        'weight_decay': args.weight_decay
     }
 
     picsellia_logger.on_train_begin(params=params, class_mapping=class_mapping)
