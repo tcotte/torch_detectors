@@ -91,7 +91,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
               f"'mAP[50]': {float(validation_metrics['map_50']):.3} / "
               f"'mAP[75]': {float(validation_metrics['map_75']):.3}")
         if validation_metrics['map'] >= best_map:
-            best_map = validation_metrics['map']
+            best_map = float(validation_metrics['map'])
             torch.save(model.state_dict(), os.path.join(path_saved_models, 'best.pth'))
 
         callback.on_epoch_end(losses=loss_training_hist.value,
@@ -99,7 +99,8 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                                   'map': float(validation_metrics['map']),
                                   'mAP[50]': float(validation_metrics['map_50']),
                                   'mAP[75]': float(validation_metrics['map_75'])
-                              })
+                              },
+                              current_lr=optimizer.param_groups[0]['lr'])
         metric.reset()
 
     torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
@@ -220,7 +221,7 @@ if __name__ == "__main__":
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=args.weight_decay)
 
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.5)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
 
     picsellia_logger = PicselliaLogger(path_env_file=PATH_ENV_FILE)
     picsellia_logger.log_split_table(
@@ -239,7 +240,8 @@ if __name__ == "__main__":
         'nb_classes': len(class_mapping),
         'single_class': SINGLE_CLS,
         'optimizer': args.optimizer,
-        'weight_decay': args.weight_decay
+        'weight_decay': args.weight_decay,
+        'pretrained_weights': args.pretrained_weights
     }
 
     picsellia_logger.on_train_begin(params=params, class_mapping=class_mapping)

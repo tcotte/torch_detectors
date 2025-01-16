@@ -39,12 +39,14 @@ class PicselliaLogger:
     #     if self._config_file is not None:
     #         self._picsellia_experiment.store('config', self._config_file)
 
-    def on_epoch_end(self, losses: dict, accuracies: dict):
+    def on_epoch_end(self, losses: dict, accuracies: dict, current_lr: float) -> None:
         for key, value in losses.items():
             self._experiment.log(name=f'Training {key}', type=LogType.LINE, data=value)
 
         for key, value in accuracies.items():
             self._experiment.log(name=f'Validation {key}', type=LogType.LINE, data=value)
+
+        self._experiment.log(name='Learning rate', type=LogType.LINE, data=current_lr)
 
     def on_train_end(self, best_validation_map: float, path_saved_models: str):
         self._experiment.log(name="Best Validation Map", type=LogType.VALUE, data=best_validation_map)

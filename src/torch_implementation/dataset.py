@@ -1,5 +1,6 @@
 import imutils
 import imutils.paths
+import numpy
 import numpy as np
 import torch
 from albumentations.pytorch import ToTensorV2

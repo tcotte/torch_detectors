@@ -15,20 +15,20 @@ class_mapping = {
     0: 'person'
 }
 
-IMAGE_SIZE = (512, 512)
+IMAGE_SIZE = (1024, 1024)
 
 # yolo.to('cuda')
 
 transform = A.Compose([
     A.Normalize(),
     A.RandomCrop(*IMAGE_SIZE),
-    A.HorizontalFlip(p=0.5),
-    A.RandomBrightnessContrast(p=0.2),
+    # A.HorizontalFlip(p=0.5),
+    # A.RandomBrightnessContrast(p=0.2),
     ToTensorV2()
 ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
 
 train_dataset = PascalVOCDataset(
-    data_folder=r"../../dataset_pascal_voc/Evry_dataset_2024_pascal_voc\VOCdevkit\VOC",
+    data_folder=r"C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\dataset\test",
     split='train',
     single_cls=True,
     transform=transform)
@@ -47,13 +47,13 @@ model = create_retinanet_model(num_classes=len(class_mapping))
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # device = torch.device('cpu')
 
-model.load_state_dict(torch.load('../../models/model_torch/retinanet.pth', weights_only=True))
+model.load_state_dict(torch.load('C:/Users/tristan_cotte/Downloads/latest.pth', weights_only=True))
 model.to(device)
 model.eval()
 
 if __name__ == "__main__":
-    MIN_CONFIDENCE = 0.1
-    MIN_IOU_THRESHOLD = 0.1
+    MIN_CONFIDENCE = 0.2
+    MIN_IOU_THRESHOLD = 0.2
 
     unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     metric = MeanAveragePrecision(iou_type="bbox")
@@ -77,6 +77,8 @@ if __name__ == "__main__":
             confidence_threshold=MIN_CONFIDENCE)
 
         metric.update(processed_predictions, targets_gpu)
+        print(metric.compute())
+        metric.reset()
 
         for index, (img, pred) in enumerate(zip(images, processed_predictions)):
             img = unorm(img)
@@ -90,7 +92,7 @@ if __name__ == "__main__":
 
             pred_scores = pred['scores'].detach().cpu().numpy()
 
-            metric.update([pred], [targets_gpu[index]])
+            # metric.update([pred], [targets_gpu[index]])
 
             for bbox_index in range(len(pred_scores)):
                 bbox = pred['boxes'][bbox_index].detach().cpu().numpy()
@@ -103,4 +105,4 @@ if __name__ == "__main__":
             plt.imshow(img)
             plt.show()
 
-    print(metric.compute())
+
