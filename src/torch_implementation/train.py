@@ -250,7 +250,9 @@ if __name__ == "__main__":
         'optimizer': args.optimizer,
         'weight_decay': args.weight_decay,
         'pretrained_weights': args.pretrained_weights,
-        'num_workers': args.num_workers
+        'num_workers': args.num_workers,
+        'lr_scheduler_step_size': args.lr_step_size,
+        'lr_scheduler_gamma': args.lr_gamma
     }
 
     picsellia_logger.on_train_begin(params=params, class_mapping=class_mapping)
