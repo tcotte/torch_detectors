@@ -119,7 +119,11 @@ parser.add_argument('-bs', '--batch_size', type=int, default=2, required=False,
 parser.add_argument('-device', '--device', type=str, default="cuda", required=False,
                     help='Device used to train the model')
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, required=False,
-                    help='Learning rate used for training')
+                    help='Initial learning rate used for training')
+parser.add_argument('--lr_step_size', type=int, default=50, required=False,
+                    help='Period of learning rate decay')
+parser.add_argument('--lr_gamma', type=float, default=0.1, required=False,
+                    help='Multiplicative factor of learning rate decay')
 parser.add_argument('-wd', '--weight_decay', type=float, default=0.0005, required=False,
                     help='Weight decay used for training')
 parser.add_argument('-env', '--path_env_file', type=str, required=True,
@@ -225,7 +229,7 @@ if __name__ == "__main__":
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=args.weight_decay)
 
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
 
     picsellia_logger = PicselliaLogger(path_env_file=PATH_ENV_FILE)
     picsellia_logger.log_split_table(
