@@ -12,3 +12,4 @@ notebooks/
 src/torch_implementation/models/
 .idea/
 src/tf_implementation/experiments/
+Output_SAHI/

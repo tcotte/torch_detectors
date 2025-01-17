@@ -79,9 +79,10 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                 iou_threshold=MIN_IOU_THRESHOLD,
                 confidence_threshold=MIN_CONFIDENCE)
 
+            # send targets to GPU
             targets_gpu = []
             for j in range(len(targets)):
-                targets_gpu.append({k: v.to(device=device, non_blocking=True) for k, v in targets[0].items()})
+                targets_gpu.append({k: v.to(device=device, non_blocking=True) for k, v in targets[j].items()})
 
             metric.update(processed_predictions, targets_gpu)
 
@@ -171,14 +172,46 @@ if __name__ == "__main__":
     PATH_SAVED_MODELS: typing.Final[str] = f"models/run_{date_time}"
     os.makedirs(PATH_SAVED_MODELS, exist_ok=True)
 
+    # train_transform = A.Compose([
+    #     A.Normalize(),
+    #     A.RandomCrop(*IMAGE_SIZE),
+    #     A.HueSaturationValue(p=0.1),
+    #     A.HorizontalFlip(p=0.5),
+    #     A.RandomBrightnessContrast(p=0.2),
+    #     ToTensorV2()
+    # ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
     train_transform = A.Compose([
-        A.Normalize(),
+        A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
+                    std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
+                    max_pixel_value= 207),
         A.RandomCrop(*IMAGE_SIZE),
-        A.HueSaturationValue(p=0.1),
         A.HorizontalFlip(p=0.5),
-        A.RandomBrightnessContrast(p=0.2),
+        A.VerticalFlip(p=0.5),
+        A.OneOf([
+            A.GaussNoise(std_range=(0.2, 0.44), mean_range = (0.0, 0.0), per_channel = True, noise_scale_factor = 1, p = 0.5),
+            A.GridDropout(
+                ratio=0.1,
+                unit_size_range=None,
+                random_offset=True,
+                p=0.2),
+        ]),
+        A.ColorJitter(brightness=(0.9, 1.1), contrast=(0.9, 1.1), saturation=(0.9, 1.1), hue=(-0.2, 0.2), p=0.5),
+        A.OneOf([
+            A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.5),
+            A.HueSaturationValue(p=0.1),
+            A.RandomBrightnessContrast(p=0.2),
+        ]),
+        A.OneOf([
+            A.ElasticTransform(alpha=1, sigma=50, interpolation=1, approximate=False, same_dxdy=False,
+                             mask_interpolation=0, noise_distribution='gaussian', p=0.2),
+            A.GridDistortion (num_steps=5, distort_limit=(-0.3, 0.3), interpolation=1, normalized=True,
+                              mask_interpolation=0, p=0.3)
+        ]),
+        A.RandomScale(scale_limit=(-0.3, 0.3), interpolation=1, mask_interpolation=0, p=0.5),
+
         ToTensorV2()
     ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
+
 
     valid_transform = A.Compose([
         A.Normalize(),
