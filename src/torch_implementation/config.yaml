@@ -1,0 +1,3 @@
+loss:
+  bbox_regression: 1.1
+  classification: 0.1

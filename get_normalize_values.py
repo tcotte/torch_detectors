@@ -12,14 +12,11 @@ if __name__ == '__main__':
         img = Image.open(image_path).convert('RGB')
         img_array = np.array(img)
 
-
-
         for index, c in enumerate(d.keys()):
             c_channel = img_array[:, :, index].reshape(-1)
             c_std = np.std(c_channel)
             c_mean = np.mean(c_channel)
             c_max = np.max(c_channel)
-
 
             dict_image = {
                 'std': c_std,
@@ -56,5 +53,3 @@ if __name__ == '__main__':
     print(f'Max pixel value {max_pixel_value}')
     print(f'RGB mean {list_rgb_mean}')
     print(f'RGB std {list_rgb_std}')
-
-

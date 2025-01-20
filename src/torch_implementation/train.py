@@ -5,6 +5,7 @@ from datetime import datetime
 
 import albumentations as A
 import torch
+import yaml
 from albumentations.pytorch import ToTensorV2
 from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
@@ -15,14 +16,34 @@ from src.torch_implementation.model_retinanet import collate_fn, create_retinane
 from src.torch_implementation.utils import Averager, apply_postprocess_on_predictions
 
 
+def apply_loss_weights(loss_dict: dict, loss_coefficients: dict) -> dict:
+    for k in loss_dict.keys():
+        loss_dict[k] *= loss_coefficients[k]
+    return loss_dict
+
+
+def read_configuration_file(config_file: str) -> typing.Union[dict, None]:
+    with open(config_file) as stream:
+        try:
+            configs = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+            return None
+    return configs
+
+
 def train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, nb_epochs, path_saved_models: str,
-                callback):
+                loss_coefficients: dict, callback):
+    visualisation_val_loss = True
     best_map = 0.0
     metric = MeanAveragePrecision(iou_type="bbox")
 
+    loss_training_hist = Averager()
+    loss_validation_hist = Averager()
+
     for epoch in range(nb_epochs):
-        loss_training_hist = Averager()
         loss_training_hist.reset()
+        loss_validation_hist.reset()
 
         model.train()
         with tqdm(train_data_loader, unit="batch") as t_epoch:
@@ -39,6 +60,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                 - l1 for regression
                 '''
                 loss_dict = model(images, targets)
+                loss_dict = apply_loss_weights(loss_dict=loss_dict, loss_coefficients=loss_coefficients)
 
                 total_loss = sum(loss for loss in loss_dict.values())
                 total_loss_value = total_loss.item()
@@ -59,7 +81,24 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                     cls_loss=loss_training_hist.value['classification']
                 )
 
-            # update the learning rate
+            if visualisation_val_loss:
+                for images, targets in val_data_loader:
+                    images = [image.to(device) for image in images]
+                    targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+                    with torch.no_grad():
+                        val_loss_dict = model(images, targets)
+
+                    val_loss_dict = apply_loss_weights(loss_dict=val_loss_dict, loss_coefficients=loss_coefficients)
+                    total_val_loss = sum(loss for loss in val_loss_dict.values())
+
+                    loss_validation_hist.send({
+                        "regression": val_loss_dict['bbox_regression'].item(),
+                        "classification": val_loss_dict['classification'].item(),
+                        "total": total_val_loss.item()
+                    })
+
+                    # update the learning rate
             if lr_scheduler is not None:
                 lr_scheduler.step()
 
@@ -87,7 +126,8 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
             metric.update(processed_predictions, targets_gpu)
 
         validation_metrics = metric.compute()
-        print(f"Epoch #{epoch} loss: {loss_training_hist.value} "
+        print(f"Epoch #{epoch} Training loss: {loss_training_hist.value} "
+              f"Validation loss {loss_validation_hist.value}"
               f"- Accuracies: 'mAP' {float(validation_metrics['map']):.3} / "
               f"'mAP[50]': {float(validation_metrics['map_50']):.3} / "
               f"'mAP[75]': {float(validation_metrics['map_75']):.3}")
@@ -95,7 +135,8 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
             best_map = float(validation_metrics['map'])
             torch.save(model.state_dict(), os.path.join(path_saved_models, 'best.pth'))
 
-        callback.on_epoch_end(losses=loss_training_hist.value,
+        callback.on_epoch_end(training_losses=loss_training_hist.value,
+                              validation_losses=loss_validation_hist.value,
                               accuracies={
                                   'map': float(validation_metrics['map']),
                                   'mAP[50]': float(validation_metrics['map_50']),
@@ -107,6 +148,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
     torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
     callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
 
+
 # todo:  add possibility to add path to models - add several workers to load data
 parser = argparse.ArgumentParser(
     prog='RetinaNet_Trainer',
@@ -115,6 +157,10 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('-epoch', '--epoch', type=int, default=100, required=False,
                     help='Number of epochs used for train the model')
+parser.add_argument('-name', '--run_name', type=str, default='', required=False,
+                    help='Experiment name')
+parser.add_argument('-configfile', '--configuration_file', type=str, default='', required=False,
+                    help='Advanced configurations file path')
 parser.add_argument('-bs', '--batch_size', type=int, default=2, required=False,
                     help='Batch size during the training')
 parser.add_argument('-device', '--device', type=str, default="cuda", required=False,
@@ -172,49 +218,53 @@ if __name__ == "__main__":
     PATH_SAVED_MODELS: typing.Final[str] = f"models/run_{date_time}"
     os.makedirs(PATH_SAVED_MODELS, exist_ok=True)
 
-    # train_transform = A.Compose([
-    #     A.Normalize(),
-    #     A.RandomCrop(*IMAGE_SIZE),
-    #     A.HueSaturationValue(p=0.1),
-    #     A.HorizontalFlip(p=0.5),
-    #     A.RandomBrightnessContrast(p=0.2),
-    #     ToTensorV2()
-    # ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
     train_transform = A.Compose([
         A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
                     std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
-                    max_pixel_value= 207),
+                    max_pixel_value=207),
         A.RandomCrop(*IMAGE_SIZE),
+        A.HueSaturationValue(p=0.1),
         A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.OneOf([
-            A.GaussNoise(std_range=(0.2, 0.44), mean_range = (0.0, 0.0), per_channel = True, noise_scale_factor = 1, p = 0.5),
-            A.GridDropout(
-                ratio=0.1,
-                unit_size_range=None,
-                random_offset=True,
-                p=0.2),
-        ]),
-        A.ColorJitter(brightness=(0.9, 1.1), contrast=(0.9, 1.1), saturation=(0.9, 1.1), hue=(-0.2, 0.2), p=0.5),
-        A.OneOf([
-            A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.5),
-            A.HueSaturationValue(p=0.1),
-            A.RandomBrightnessContrast(p=0.2),
-        ]),
-        A.OneOf([
-            A.ElasticTransform(alpha=1, sigma=50, interpolation=1, approximate=False, same_dxdy=False,
-                             mask_interpolation=0, noise_distribution='gaussian', p=0.2),
-            A.GridDistortion (num_steps=5, distort_limit=(-0.3, 0.3), interpolation=1, normalized=True,
-                              mask_interpolation=0, p=0.3)
-        ]),
-        A.RandomScale(scale_limit=(-0.3, 0.3), interpolation=1, mask_interpolation=0, p=0.5),
-
+        A.RandomBrightnessContrast(p=0.2),
         ToTensorV2()
     ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
 
+    # train_transform = A.Compose([
+    #     A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
+    #                 std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
+    #                 max_pixel_value=207),
+    #     A.RandomCrop(*IMAGE_SIZE),
+    #     A.HorizontalFlip(p=0.5),
+    #     A.VerticalFlip(p=0.5),
+    #     A.OneOf([
+    #         A.GaussNoise(std_range=(0.2, 0.44), mean_range=(0.0, 0.0), per_channel=True, noise_scale_factor=1, p=0.5),
+    #         A.GridDropout(
+    #             ratio=0.1,
+    #             unit_size_range=None,
+    #             random_offset=True,
+    #             p=0.2),
+    #     ]),
+    #     A.ColorJitter(brightness=(0.9, 1.1), contrast=(0.9, 1.1), saturation=(0.9, 1.1), hue=(-0.2, 0.2), p=0.5),
+    #     A.OneOf([
+    #         A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.5),
+    #         A.HueSaturationValue(p=0.1),
+    #         A.RandomBrightnessContrast(p=0.2),
+    #     ]),
+    #     A.OneOf([
+    #         A.ElasticTransform(alpha=1, sigma=50, interpolation=1, approximate=False, same_dxdy=False,
+    #                            mask_interpolation=0, noise_distribution='gaussian', p=0.2),
+    #         A.GridDistortion(num_steps=5, distort_limit=(-0.3, 0.3), interpolation=1, normalized=True,
+    #                          mask_interpolation=0, p=0.3)
+    #     ]),
+    #     A.RandomScale(scale_limit=(-0.3, 0.3), interpolation=1, mask_interpolation=0, p=0.5),
+    #
+    #     ToTensorV2()
+    # ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
 
     valid_transform = A.Compose([
-        A.Normalize(),
+        A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
+                    std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
+                    max_pixel_value=207),
         A.RandomCrop(*IMAGE_SIZE),
         ToTensorV2()
     ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
@@ -250,7 +300,10 @@ if __name__ == "__main__":
     # TODO concatenate class mappings of train and test datasets
     class_mapping = train_dataset.class_mapping
 
-    model = create_retinanet_model(num_classes=len(class_mapping), use_pretrained_weights=args.pretrained_weights)
+    model = create_retinanet_model(num_classes=len(class_mapping),
+                                   use_pretrained_weights=args.pretrained_weights,
+                                   score_threshold=args.confidence_threshold,
+                                   iou_threshold=args.iou_threshold)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -264,7 +317,19 @@ if __name__ == "__main__":
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
 
-    picsellia_logger = PicselliaLogger(path_env_file=PATH_ENV_FILE)
+    if args.configuration_file is not None:
+        configs = read_configuration_file(args.configuration_file)
+    else:
+        configs = {
+            'loss': {
+                'bbox_regression': 1,
+                'classification': 1
+            }
+        }
+
+    run_name = args.run_name if args.run_name != '' else None
+
+    picsellia_logger = PicselliaLogger(path_env_file=PATH_ENV_FILE, run_name=run_name)
     picsellia_logger.log_split_table(
         annotations_in_split={"train": len(train_dataset), "val": len(val_dataset)},
         title="Nb elem / split")
@@ -285,10 +350,13 @@ if __name__ == "__main__":
         'pretrained_weights': args.pretrained_weights,
         'num_workers': args.num_workers,
         'lr_scheduler_step_size': args.lr_step_size,
-        'lr_scheduler_gamma': args.lr_gamma
+        'lr_scheduler_gamma': args.lr_gamma,
+        'loss_weight_regression': configs['loss']['bbox_regression'],
+        'loss_weight_classification': configs['loss']['classification']
+
     }
 
     picsellia_logger.on_train_begin(params=params, class_mapping=class_mapping)
 
     train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, NB_EPOCHS, PATH_SAVED_MODELS,
-                callback=picsellia_logger)
+                loss_coefficients=configs['loss'], callback=picsellia_logger)

@@ -41,9 +41,17 @@ avons des résultats intéressants avec ces models.
 Implementer Nanodet: https://github.com/RangiLyu/nanodet
 
 
+### RetinaNet
 
-
-
+TODO:
+- Envoyer les paramètres de normalization dans le model + parametres de post-process https://pytorch.org/vision/0.13/models/generated/torchvision.models.detection.retinanet_resnet50_fpn_v2.html#torchvision.models.detection.retinanet_resnet50_fpn_v2
+- change number of channels to freeze
+- Add patience
+- Add possibility to see validation loss https://discuss.pytorch.org/t/compute-validation-loss-for-faster-rcnn/62333
+- learning rate decay https://towardsdatascience.com/learning-rate-schedules-and-adaptive-learning-rate-methods-for-deep-learning-2c8f433990d1
+- implement learning rate warmup
+- Ré-essayer la normalization avec les params calculés en mode 'custom dataset'
+- 
 
 
 
