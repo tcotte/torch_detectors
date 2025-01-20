@@ -22,6 +22,7 @@ def create_retinanet_model(
         use_pretrained_weights: bool = True,
         mean_values: Union[Tuple[float, float, float], None] = (1.0, 1.0, 1.0),
         std_values: Union[Tuple[float, float, float], None] = (0.0, 0.0, 0.0),
+        unfrozen_layers: int= 3
 ):
     if use_pretrained_weights:
         weights = RetinaNet_ResNet50_FPN_V2_Weights.COCO_V1
@@ -35,6 +36,7 @@ def create_retinanet_model(
         score_thresh=score_threshold,
         nms_thresh=iou_threshold,
         detections_per_img=max_det,
+        trainable_backbone_layers=unfrozen_layers
     )
 
     num_anchors = model.head.classification_head.num_anchors

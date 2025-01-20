@@ -1,4 +1,7 @@
+import typing
+
 import torch
+import yaml
 from torchvision.ops import nms
 
 
@@ -97,3 +100,36 @@ def apply_postprocess_on_predictions(predictions: list[dict], iou_threshold: flo
                                                           iou_threshold=iou_threshold)
         post_processed_predictions.append(one_picture_prediction)
     return predictions
+
+
+class EarlyStopper:
+    def __init__(self, patience: int=1, min_delta: int=0):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.min_validation_loss = float('inf')
+
+    def early_stop(self, validation_loss):
+        if validation_loss < self.min_validation_loss:
+            self.min_validation_loss = validation_loss
+            self.counter = 0
+        elif validation_loss > (self.min_validation_loss + self.min_delta):
+            self.counter += 1
+            if self.counter >= self.patience:
+                return True
+        return False
+
+def apply_loss_weights(loss_dict: dict, loss_coefficients: dict) -> dict:
+    for k in loss_dict.keys():
+        loss_dict[k] *= loss_coefficients[k]
+    return loss_dict
+
+
+def read_configuration_file(config_file: str) -> typing.Union[dict, None]:
+    with open(config_file) as stream:
+        try:
+            configs = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+            return None
+    return configs

@@ -49,6 +49,8 @@ class PascalVOCDataset(Dataset):
         self.transform = transform
 
     def get_class_mapping(self):
+        print(f'Compute class mapping for {self.split} dataset')
+
         list_classes = []
         dict_classes = {}
 
@@ -127,7 +129,7 @@ class PascalVOCDataset(Dataset):
         transformed = self.transform(image=np.array(image),
                                      bboxes=np.array(objects['boxes']),
                                      class_labels=np.array(objects['labels']))
-        image = transformed['image']
+        image = transformed['image'] / 225.
         boxes = torch.FloatTensor(transformed['bboxes'])  # (n_objects, 4)
         labels = torch.LongTensor(transformed['class_labels'])  # (n_objects)
 

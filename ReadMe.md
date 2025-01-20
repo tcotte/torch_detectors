@@ -45,15 +45,19 @@ Implementer Nanodet: https://github.com/RangiLyu/nanodet
 
 TODO:
 - Envoyer les paramètres de normalization dans le model + parametres de post-process https://pytorch.org/vision/0.13/models/generated/torchvision.models.detection.retinanet_resnet50_fpn_v2.html#torchvision.models.detection.retinanet_resnet50_fpn_v2
-- change number of channels to freeze
-- Add patience
-- Add possibility to see validation loss https://discuss.pytorch.org/t/compute-validation-loss-for-faster-rcnn/62333
+- remove A.Normalize() from transform and pass std/mean parameters to model
+- [To test] change number of channels to freeze 
+- Ajouter la possibilité d'inclure des poids déjà entraînés du backbone
+- [To test] Add patience
+- [DONE] Add possibility to see validation loss https://discuss.pytorch.org/t/compute-validation-loss-for-faster-rcnn/62333
 - learning rate decay https://towardsdatascience.com/learning-rate-schedules-and-adaptive-learning-rate-methods-for-deep-learning-2c8f433990d1
-- implement learning rate warmup
+- [DONE] implement learning rate warmup -> only exponential warmup implemented
 - Ré-essayer la normalization avec les params calculés en mode 'custom dataset'
-- 
-
-
+- Transform model to ONNX
+- Try grid evaluation with SGD (-> different learning rates)
+- Import custom torch weights
+- Import backbone weights
+- Inclure mosaic and 
 
 
 

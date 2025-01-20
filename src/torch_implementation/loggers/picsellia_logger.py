@@ -5,7 +5,7 @@ from typing import Union
 
 from dotenv import load_dotenv
 from picsellia import Client
-from picsellia.types.enums import LogType
+from picsellia.types.enums import LogType, JobStatus
 
 
 class PicselliaLogger:
@@ -85,13 +85,14 @@ class PicselliaLogger:
         for key, value in accuracies.items():
             self._experiment.log(name=f'Validation {key}', type=LogType.LINE, data=value)
 
-
         self._experiment.log(name='Learning rate', type=LogType.LINE, data=current_lr)
 
     def on_train_end(self, best_validation_map: float, path_saved_models: str):
         self._experiment.log(name="Best Validation Map", type=LogType.VALUE, data=best_validation_map)
         self.store_model(model_path=os.path.join(path_saved_models, 'best.pth'), model_name='model-best')
         self.store_model(model_path=os.path.join(path_saved_models, 'latest.pth'), model_name='model-latest')
+
+        self._experiment.update_job_status(JobStatus.TERMINATED)
 
     def store_model(self, model_path: str, model_name: str) -> None:
         self._experiment.store(model_name, model_path, do_zip=True)
@@ -112,7 +113,6 @@ class PicselliaLogger:
             training_dataset_version = self._client.get_dataset_version_by_id(os.getenv('TRAINING_DATASET_ID'))
             self._experiment.attach_dataset(name="training", dataset_version=training_dataset_version)
             print(f'Attach {training_dataset_version.name} to {self._experiment.name}')
-
 
 # if __name__ == '__main__':
 #     pl = PicselliaLogger(path_env_file=r'C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\.env')

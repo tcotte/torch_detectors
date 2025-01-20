@@ -5,35 +5,21 @@ from datetime import datetime
 
 import albumentations as A
 import torch
-import yaml
 from albumentations.pytorch import ToTensorV2
+from pytorch_warmup import ExponentialWarmup
 from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
 
 from src.torch_implementation.dataset import PascalVOCDataset
 from src.torch_implementation.loggers.picsellia_logger import PicselliaLogger
 from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
-from src.torch_implementation.utils import Averager, apply_postprocess_on_predictions
+from src.torch_implementation.utils import Averager, apply_postprocess_on_predictions, EarlyStopper, apply_loss_weights, \
+    read_configuration_file
 
 
-def apply_loss_weights(loss_dict: dict, loss_coefficients: dict) -> dict:
-    for k in loss_dict.keys():
-        loss_dict[k] *= loss_coefficients[k]
-    return loss_dict
-
-
-def read_configuration_file(config_file: str) -> typing.Union[dict, None]:
-    with open(config_file) as stream:
-        try:
-            configs = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            print(exc)
-            return None
-    return configs
-
-
-def train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, nb_epochs, path_saved_models: str,
-                loss_coefficients: dict, callback):
+def train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, lr_warmup, nb_epochs,
+                path_saved_models: str, loss_coefficients: dict, patience: int, callback):
+    early_stopper = EarlyStopper(patience=patience)
     visualisation_val_loss = True
     best_map = 0.0
     metric = MeanAveragePrecision(iou_type="bbox")
@@ -51,7 +37,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
             for images, targets in t_epoch:
                 t_epoch.set_description(f"Epoch {epoch}")
 
-                images = list(image.to(device) for image in images)
+                images = list(image.type(torch.FloatTensor).to(device) for image in images)
                 targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
                 '''
@@ -98,8 +84,13 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                         "total": total_val_loss.item()
                     })
 
-                    # update the learning rate
-            if lr_scheduler is not None:
+                    if early_stopper.early_stop(validation_loss=total_val_loss.item()):
+                        torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
+                        callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
+                        break
+
+            # update the learning rate
+            with lr_warmup.dampening():
                 lr_scheduler.step()
 
         # get_CUDA_memory_allocation()
@@ -149,7 +140,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
     callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
 
 
-# todo:  add possibility to add path to models - add several workers to load data
+# todo:  add possibility to add path to models
 parser = argparse.ArgumentParser(
     prog='RetinaNet_Trainer',
     description='The aim of this program is to train RetinaNet model with custom dataset',
@@ -193,8 +184,15 @@ parser.add_argument('-conf', '--confidence_threshold', type=float, default=0.2, 
                     help='Confidence threshold used to evaluate model')
 parser.add_argument('-iou', '--iou_threshold', type=float, default=0.2, required=False,
                     help='IoU threshold used to evaluate model when NMS is applied')
+parser.add_argument( '--unfreeze', type=int, default=2, required=False,
+                    help='Number of trainable layers starting from final block')
+parser.add_argument( '--patience', type=int, default=100, required=False,
+                    help='Number of epochs to wait without improvement in validation loss before early stopping the '
+                         'training')
 
 args = parser.parse_args()
+
+assert(0 <= args.unfreeze <= 5, f"Number of unfrozen backbone layers has to lie between 0 and 5, got: {args.unfreeze}")
 
 MIN_CONFIDENCE: typing.Final[float] = args.confidence_threshold
 MIN_IOU_THRESHOLD: typing.Final[float] = args.iou_threshold
@@ -219,9 +217,9 @@ if __name__ == "__main__":
     os.makedirs(PATH_SAVED_MODELS, exist_ok=True)
 
     train_transform = A.Compose([
-        A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
-                    std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
-                    max_pixel_value=207),
+        # A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
+        #             std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
+        #             max_pixel_value=207),
         A.RandomCrop(*IMAGE_SIZE),
         A.HueSaturationValue(p=0.1),
         A.HorizontalFlip(p=0.5),
@@ -262,9 +260,9 @@ if __name__ == "__main__":
     # ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
 
     valid_transform = A.Compose([
-        A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
-                    std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
-                    max_pixel_value=207),
+        # A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
+        #             std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
+        #             max_pixel_value=207),
         A.RandomCrop(*IMAGE_SIZE),
         ToTensorV2()
     ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
@@ -297,13 +295,37 @@ if __name__ == "__main__":
         collate_fn=collate_fn
     )
 
+    if args.configuration_file is not None:
+        configs = read_configuration_file(args.configuration_file)
+    else:
+        configs = {
+            'loss': {
+                'bbox_regression': 1,
+                'classification': 1
+            },
+            'augmentations': {
+                    'normalization': {
+                        'mean': None,
+                        'std': None
+                    }
+                },
+            'learning_rate': {
+                'warmup': {
+                    'last_step': 1,
+                    'warmup_period': 1
+                }
+
+            }
+        }
+
     # TODO concatenate class mappings of train and test datasets
     class_mapping = train_dataset.class_mapping
 
     model = create_retinanet_model(num_classes=len(class_mapping),
                                    use_pretrained_weights=args.pretrained_weights,
                                    score_threshold=args.confidence_threshold,
-                                   iou_threshold=args.iou_threshold)
+                                   iou_threshold=args.iou_threshold,
+                                   unfrozen_layers=args.unfreeze)
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -316,16 +338,10 @@ if __name__ == "__main__":
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=args.weight_decay)
 
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
-
-    if args.configuration_file is not None:
-        configs = read_configuration_file(args.configuration_file)
-    else:
-        configs = {
-            'loss': {
-                'bbox_regression': 1,
-                'classification': 1
-            }
-        }
+    warmup_scheduler = ExponentialWarmup(optimizer,
+                                         warmup_period=configs['learning_rate']['warmup']['warmup_period'],
+                                         last_step=configs['learning_rate']['warmup']['last_step']
+                                         )
 
     run_name = args.run_name if args.run_name != '' else None
 
@@ -352,11 +368,17 @@ if __name__ == "__main__":
         'lr_scheduler_step_size': args.lr_step_size,
         'lr_scheduler_gamma': args.lr_gamma,
         'loss_weight_regression': configs['loss']['bbox_regression'],
-        'loss_weight_classification': configs['loss']['classification']
-
+        'loss_weight_classification': configs['loss']['classification'],
+        'normalization_mean': model.transform.image_mean,
+        'normalization_std': model.transform.image_std,
+        'unfrozen_backbone_layers': args.unfreeze,
+        'used_GPU': torch.cuda.get_device_name(),
+        'patience': args.patience,
+        'exp_warmup_last_step': configs['learning_rate']['warmup']['last_step'],
+        'exp_warmup_period': configs['learning_rate']['warmup']['warmup_period']
     }
 
     picsellia_logger.on_train_begin(params=params, class_mapping=class_mapping)
 
-    train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, NB_EPOCHS, PATH_SAVED_MODELS,
-                loss_coefficients=configs['loss'], callback=picsellia_logger)
+    train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, warmup_scheduler, NB_EPOCHS, PATH_SAVED_MODELS,
+                loss_coefficients=configs['loss'], callback=picsellia_logger, patience=args.patience)
