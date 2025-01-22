@@ -57,7 +57,7 @@ TODO:
 - Try grid evaluation with SGD (-> different learning rates)
 - Import custom torch weights
 - Import backbone weights
-- Inclure mosaic and 
+- Include mosaic and ...
 
 
 

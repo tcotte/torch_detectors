@@ -1,11 +1,11 @@
 loss:
-  bbox_regression: 1.1
-  classification: 0.1
+  bbox_regression: 0.99
+  classification: 0.01
 
 learning_rate:
   warmup:
     last_step: 5
-    warmup_period: 0.5
+    warmup_period: 2
 
 augmentations:
   normalization:

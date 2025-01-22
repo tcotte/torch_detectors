@@ -5,7 +5,7 @@ from typing import Union
 
 from dotenv import load_dotenv
 from picsellia import Client
-from picsellia.types.enums import LogType, JobStatus
+from picsellia.types.enums import LogType, JobStatus, ExperimentStatus
 
 
 class PicselliaLogger:
@@ -92,7 +92,7 @@ class PicselliaLogger:
         self.store_model(model_path=os.path.join(path_saved_models, 'best.pth'), model_name='model-best')
         self.store_model(model_path=os.path.join(path_saved_models, 'latest.pth'), model_name='model-latest')
 
-        self._experiment.update_job_status(JobStatus.TERMINATED)
+        self._experiment.update(status=ExperimentStatus.TERMINATED)
 
     def store_model(self, model_path: str, model_name: str) -> None:
         self._experiment.store(model_name, model_path, do_zip=True)

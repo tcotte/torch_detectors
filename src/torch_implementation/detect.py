@@ -17,12 +17,12 @@ class_mapping = {
 }
 
 IMAGE_SIZE = (1024, 1024)
-MODEL_PATH: typing.Final[str] = r'C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\models\run_01_17_2025_09_00_22\latest.pth'
+MODEL_PATH: typing.Final[str] = r'C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\src\torch_implementation\models\best_normalization_custom_retinanet.pth'
 BATCH_SIZE = 4
 # yolo.to('cuda')
 
 transform = A.Compose([
-    A.Normalize(),
+    # A.Normalize(),
     A.RandomCrop(*IMAGE_SIZE),
     # A.HorizontalFlip(p=0.5),
     # A.RandomBrightnessContrast(p=0.2),
@@ -42,9 +42,18 @@ data_loader = torch.utils.data.DataLoader(
     # collate_fn=train_dataset.collate_fn
     collate_fn=collate_fn
 )
+MIN_CONFIDENCE = 0.5
+MIN_IOU_THRESHOLD = 0.1
 
 # model = create_faster_rcnn_model(num_classes=2)
-model = create_retinanet_model(num_classes=len(class_mapping))
+model = create_retinanet_model(num_classes=len(class_mapping),
+                               use_pretrained_weights=True,
+                               score_threshold=MIN_IOU_THRESHOLD,
+                               iou_threshold=MIN_CONFIDENCE,
+                               unfrozen_layers=3,
+                               mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
+                               std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
+                               )
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # device = torch.device('cpu')
@@ -54,10 +63,9 @@ model.to(device)
 model.eval()
 
 if __name__ == "__main__":
-    MIN_CONFIDENCE = 0.25
-    MIN_IOU_THRESHOLD = 0.2
 
-    unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+
+    # unorm = UnNormalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     metric_by_batch = MeanAveragePrecision(iou_type="bbox")
     metric_onebyone = MeanAveragePrecision(iou_type="bbox")
 
@@ -89,7 +97,7 @@ if __name__ == "__main__":
         metric_by_batch.reset()
 
         for index, (img, pred) in enumerate(zip(images, processed_predictions)):
-            img = unorm(img)
+            # img = unorm(img)
             img = img.detach().cpu().numpy()
             img = img.transpose(1, 2, 0)
 

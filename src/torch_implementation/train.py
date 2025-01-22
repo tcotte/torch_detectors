@@ -84,10 +84,10 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                         "total": total_val_loss.item()
                     })
 
-                    if early_stopper.early_stop(validation_loss=total_val_loss.item()):
-                        torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
-                        callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
-                        break
+                if early_stopper.early_stop(validation_loss=total_val_loss.item()):
+                    torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
+                    callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
+                    break
 
             # update the learning rate
             with lr_warmup.dampening():
@@ -325,7 +325,10 @@ if __name__ == "__main__":
                                    use_pretrained_weights=args.pretrained_weights,
                                    score_threshold=args.confidence_threshold,
                                    iou_threshold=args.iou_threshold,
-                                   unfrozen_layers=args.unfreeze)
+                                   unfrozen_layers=args.unfreeze,
+                                   mean_values=configs['augmentations']['normalization']['mean'],
+                                   std_values=configs['augmentations']['normalization']['std']
+                                   )
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 

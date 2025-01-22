@@ -1,17 +1,11 @@
-import os
 from functools import partial
 from typing import Union, Tuple
 
-import albumentations as A
 import torch
 import torchvision
-from albumentations.pytorch import ToTensorV2
 from torchvision.models.detection import RetinaNet_ResNet50_FPN_V2_Weights
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.retinanet import RetinaNetClassificationHead
-
-from src.torch_implementation.dataset import PascalVOCDataset
-import json
 
 
 def create_retinanet_model(
@@ -20,8 +14,8 @@ def create_retinanet_model(
         max_det: int = 300,
         num_classes: int = 91,
         use_pretrained_weights: bool = True,
-        mean_values: Union[Tuple[float, float, float], None] = (1.0, 1.0, 1.0),
-        std_values: Union[Tuple[float, float, float], None] = (0.0, 0.0, 0.0),
+        mean_values: Union[Tuple[float, float, float], None] = None,
+        std_values: Union[Tuple[float, float, float], None] = None,
         unfrozen_layers: int= 3
 ):
     if use_pretrained_weights:
