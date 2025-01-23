@@ -22,7 +22,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
     early_stopper = EarlyStopper(patience=patience)
     visualisation_val_loss = True
     best_map = 0.0
-    metric = MeanAveragePrecision(iou_type="bbox")
+    metric = MeanAveragePrecision(iou_type="bbox", extended_summary=True)
 
     loss_training_hist = Averager()
     loss_validation_hist = Averager()
@@ -117,11 +117,16 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
             metric.update(processed_predictions, targets_gpu)
 
         validation_metrics = metric.compute()
+
+        # TODO display precision / recall in Picsellia interface
+
         print(f"Epoch #{epoch} Training loss: {loss_training_hist.value} "
               f"Validation loss {loss_validation_hist.value}"
               f"- Accuracies: 'mAP' {float(validation_metrics['map']):.3} / "
               f"'mAP[50]': {float(validation_metrics['map_50']):.3} / "
-              f"'mAP[75]': {float(validation_metrics['map_75']):.3}")
+              f"'mAP[75]': {float(validation_metrics['map_75']):.3} /"
+              f"'Precision': {float(validation_metrics['precision']):.3} / "
+              f"'Recall': {float(validation_metrics['recall']):.3} ")
         if validation_metrics['map'] >= best_map:
             best_map = float(validation_metrics['map'])
             torch.save(model.state_dict(), os.path.join(path_saved_models, 'best.pth'))
@@ -131,7 +136,9 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                               accuracies={
                                   'map': float(validation_metrics['map']),
                                   'mAP[50]': float(validation_metrics['map_50']),
-                                  'mAP[75]': float(validation_metrics['map_75'])
+                                  'mAP[75]': float(validation_metrics['map_75']),
+                                  'precision': float(validation_metrics['precision']),
+                                  'recall': float(validation_metrics['recall'])
                               },
                               current_lr=optimizer.param_groups[0]['lr'])
         metric.reset()
