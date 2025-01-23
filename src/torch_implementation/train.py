@@ -119,14 +119,22 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
         validation_metrics = metric.compute()
 
         # TODO display precision / recall in Picsellia interface
+        '''
+        - ``precision``: a tensor of shape ``(TxRxKxAxM)`` containing the precision values. Here ``T`` is the
+                  number of IoU thresholds, ``R`` is the number of recall thresholds, ``K`` is the number of classes,
+                  ``A`` is the number of areas and ``M`` is the number of max detections per image.
+        - ``recall``: a tensor of shape ``(TxKxAxM)`` containing the recall values. Here ``T`` is the number of
+          IoU thresholds, ``K`` is the number of classes, ``A`` is the number of areas and ``M`` is the number
+          of max detections per image
+        '''
 
         print(f"Epoch #{epoch} Training loss: {loss_training_hist.value} "
               f"Validation loss {loss_validation_hist.value}"
               f"- Accuracies: 'mAP' {float(validation_metrics['map']):.3} / "
               f"'mAP[50]': {float(validation_metrics['map_50']):.3} / "
               f"'mAP[75]': {float(validation_metrics['map_75']):.3} /"
-              f"'Precision': {float(validation_metrics['precision']):.3} / "
-              f"'Recall': {float(validation_metrics['recall']):.3} ")
+              f"'Precision': {float(validation_metrics['precision'][0][25][0][0][-1]):.3} / "
+              f"'Recall': {float(validation_metrics['recall'][0][0][0][-1]):.3} ")
         if validation_metrics['map'] >= best_map:
             best_map = float(validation_metrics['map'])
             torch.save(model.state_dict(), os.path.join(path_saved_models, 'best.pth'))
@@ -137,8 +145,8 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                                   'map': float(validation_metrics['map']),
                                   'mAP[50]': float(validation_metrics['map_50']),
                                   'mAP[75]': float(validation_metrics['map_75']),
-                                  'precision': float(validation_metrics['precision']),
-                                  'recall': float(validation_metrics['recall'])
+                                  'precision': float(validation_metrics['precision'][0][25][0][0][-1]),
+                                  'recall': float(validation_metrics['recall'][0][0][0][-1])
                               },
                               current_lr=optimizer.param_groups[0]['lr'])
         metric.reset()
