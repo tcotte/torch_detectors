@@ -67,7 +67,7 @@ if __name__ == '__main__':
         print(f"Time taken to run ONNX: {time.time() - start_prediction_onnx}")
 
         retinanet = create_retinanet_model(num_classes=len(class_mapping),
-                                           use_pretrained_weights=True,
+                                           use_COCO_pretrained_weights=True,
                                            score_threshold=MIN_IOU_THRESHOLD,
                                            iou_threshold=MIN_CONFIDENCE,
                                            unfrozen_layers=3,

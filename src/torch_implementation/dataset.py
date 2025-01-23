@@ -116,7 +116,11 @@ class PascalVOCDataset(Dataset):
                 for cls in classes
             ]
         else:
-            class_ids = [1] * len(boxes)
+            if self._add_bckd_as_class:
+                class_ids = [1] * len(boxes)
+            else:
+                class_ids = [0] * len(boxes)
+
         return {'boxes': boxes, 'labels': class_ids, 'image': image_path}
 
     def __getitem__(self, i):

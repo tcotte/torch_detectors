@@ -59,7 +59,12 @@ TODO:
 - Import backbone weights
 - Include mosaic and ...
 
-
+- Display precision_recall curve
+- [test]Print available space on CUDA
+- [test]Import existing weights 
+- Création evaluation experiment picsellia
+- 
+- 
 
 
 

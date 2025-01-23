@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from picsellia import Client
 from picsellia.types.enums import LogType, JobStatus, ExperimentStatus
 
+from src.torch_implementation.utils import get_GPU_occupancy
+
 
 class PicselliaLogger:
     def __init__(self, path_env_file, create_new_experiment: bool = True, run_name: Union[str, None] = None):
@@ -72,7 +74,8 @@ class PicselliaLogger:
     #     if self._config_file is not None:
     #         self._picsellia_experiment.store('config', self._config_file)
 
-    def on_epoch_end(self, training_losses: dict, accuracies: dict, current_lr: float, validation_losses=None) -> None:
+    def on_epoch_end(self, training_losses: dict, accuracies: dict, current_lr: float,
+                     display_gpu_occupancy: bool = True, validation_losses=None) -> None:
         if validation_losses is None:
             validation_losses = {}
 
@@ -85,17 +88,29 @@ class PicselliaLogger:
         for key, value in accuracies.items():
             self._experiment.log(name=f'Validation {key}', type=LogType.LINE, data=value)
 
+        if display_gpu_occupancy:
+            self._experiment.log(name='GPU occupancy (%)', type=LogType.LINE, data=get_GPU_occupancy())
+
         self._experiment.log(name='Learning rate', type=LogType.LINE, data=current_lr)
 
-    def on_train_end(self, best_validation_map: float, path_saved_models: str):
+    def on_train_end(self, best_validation_map: float, path_saved_models: str, path_precision_recall_plot: str):
         self._experiment.log(name="Best Validation Map", type=LogType.VALUE, data=best_validation_map)
         self.store_model(model_path=os.path.join(path_saved_models, 'best.pth'), model_name='model-best')
         self.store_model(model_path=os.path.join(path_saved_models, 'latest.pth'), model_name='model-latest')
+
+        try:
+            self._experiment.log("precision-recall curve", type=LogType.IMAGE, data=path_precision_recall_plot)
+        except:
+            print(f"Precision-recall curve not found at {path_precision_recall_plot}")
+            pass
 
         self._experiment.update(status=ExperimentStatus.TERMINATED)
 
     def store_model(self, model_path: str, model_name: str) -> None:
         self._experiment.store(model_name, model_path, do_zip=True)
+
+    def get_experiment_id(self) -> str:
+        return self._experiment.id
 
     def create_experiment(self, run_name: Union[str, None] = None) -> None:
         load_dotenv(self._path_env_file)

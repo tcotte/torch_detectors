@@ -13,13 +13,18 @@ def create_retinanet_model(
         iou_threshold: float,
         max_det: int = 300,
         num_classes: int = 91,
-        use_pretrained_weights: bool = True,
+        use_COCO_pretrained_weights: bool = True,
         mean_values: Union[Tuple[float, float, float], None] = None,
         std_values: Union[Tuple[float, float, float], None] = None,
-        unfrozen_layers: int= 3
+        unfrozen_layers: int = 3,
+        trained_weights: Union[str, None] = None
 ):
-    if use_pretrained_weights:
-        weights = RetinaNet_ResNet50_FPN_V2_Weights.COCO_V1
+    if trained_weights is None:
+        if use_COCO_pretrained_weights:
+            weights = RetinaNet_ResNet50_FPN_V2_Weights.COCO_V1
+        else:
+            weights = None
+
     else:
         weights = None
 
@@ -40,6 +45,10 @@ def create_retinanet_model(
         num_classes=num_classes,
         norm_layer=partial(torch.nn.GroupNorm, 32)
     )
+
+    if trained_weights is not None:
+        model.load_state_dict(torch.load(trained_weights, weights_only=True))
+
     return model
 
 
@@ -57,7 +66,6 @@ def create_faster_rcnn_model(num_classes=91):
 
 def collate_fn(batch):
     return tuple(zip(*batch))
-
 
 # if __name__ == "__main__":
 #     class_mapping = {

@@ -103,7 +103,7 @@ def apply_postprocess_on_predictions(predictions: list[dict], iou_threshold: flo
 
 
 class EarlyStopper:
-    def __init__(self, patience: int=1, min_delta: int=0):
+    def __init__(self, patience: int = 1, min_delta: int = 0):
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
@@ -119,6 +119,7 @@ class EarlyStopper:
                 return True
         return False
 
+
 def apply_loss_weights(loss_dict: dict, loss_coefficients: dict) -> dict:
     for k in loss_dict.keys():
         loss_dict[k] *= loss_coefficients[k]
@@ -133,3 +134,12 @@ def read_configuration_file(config_file: str) -> typing.Union[dict, None]:
             print(exc)
             return None
     return configs
+
+
+def get_GPU_occupancy(gpu_id: int = 0) -> float:
+    if torch.cuda.is_available():
+        free_memory, total_memory = torch.cuda.mem_get_info(device=gpu_id)
+        return 1 - free_memory / total_memory
+
+    else:
+        return 0.0

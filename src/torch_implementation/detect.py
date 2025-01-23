@@ -47,7 +47,7 @@ MIN_IOU_THRESHOLD = 0.1
 
 # model = create_faster_rcnn_model(num_classes=2)
 model = create_retinanet_model(num_classes=len(class_mapping),
-                               use_pretrained_weights=True,
+                               use_COCO_pretrained_weights=True,
                                score_threshold=MIN_IOU_THRESHOLD,
                                iou_threshold=MIN_CONFIDENCE,
                                unfrozen_layers=3,

@@ -6,19 +6,40 @@ from datetime import datetime
 import albumentations as A
 import torch
 from albumentations.pytorch import ToTensorV2
+from matplotlib import pyplot as plt
 from pytorch_warmup import ExponentialWarmup
 from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
 
 from src.torch_implementation.dataset import PascalVOCDataset
+from src.torch_implementation.eval import plot_precision_recall_curve
 from src.torch_implementation.loggers.picsellia_logger import PicselliaLogger
 from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
 from src.torch_implementation.utils import Averager, apply_postprocess_on_predictions, EarlyStopper, apply_loss_weights, \
-    read_configuration_file
+    read_configuration_file, get_GPU_occupancy
 
 
 def train_model(model, optimizer, train_data_loader, val_data_loader, lr_scheduler, lr_warmup, nb_epochs,
                 path_saved_models: str, loss_coefficients: dict, patience: int, callback):
+
+    def _on_end_training():
+        torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
+
+        precision_recall_curve = plot_precision_recall_curve(validation_metrics=validation_metrics,
+                                                             recall_thresholds=torch.linspace(0.0, 1.00, round(
+                                                                 1.00 / 0.01) + 1).tolist())
+
+        output_dir = f'../../{picsellia_logger.get_experiment_id()}'
+        os.makedirs(output_dir, exist_ok=True)
+
+        precision_recall_curve_plot_path = os.path.join(output_dir, 'precision_recall_curve.png')
+        plt.savefig(precision_recall_curve_plot_path)
+
+        callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models,
+                              path_precision_recall_plot= precision_recall_curve_plot_path)
+
+
+
     early_stopper = EarlyStopper(patience=patience)
     visualisation_val_loss = True
     best_map = 0.0
@@ -84,16 +105,15 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                         "total": total_val_loss.item()
                     })
 
-                if early_stopper.early_stop(validation_loss=total_val_loss.item()):
-                    torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
-                    callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
+                if early_stopper.early_stop(validation_loss=loss_validation_hist.value['total']):
+                    _on_end_training()
                     break
 
             # update the learning rate
             with lr_warmup.dampening():
                 lr_scheduler.step()
 
-        # get_CUDA_memory_allocation()
+        # Evaluation
 
         model.eval()
 
@@ -112,6 +132,7 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
             # send targets to GPU
             targets_gpu = []
             for j in range(len(targets)):
+
                 targets_gpu.append({k: v.to(device=device, non_blocking=True) for k, v in targets[j].items()})
 
             metric.update(processed_predictions, targets_gpu)
@@ -149,10 +170,11 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
                                   'recall': float(validation_metrics['recall'][0][0][0][-1])
                               },
                               current_lr=optimizer.param_groups[0]['lr'])
-        metric.reset()
 
-    torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
-    callback.on_train_end(best_validation_map=best_map, path_saved_models=path_saved_models)
+        if not epoch == nb_epochs - 1:
+            metric.reset()
+
+    _on_end_training()
 
 
 # todo:  add possibility to add path to models
@@ -193,8 +215,10 @@ parser.add_argument('-imgsz', '--image_size', nargs='+', type=int,
                     help='Training image size')
 parser.add_argument("-sglcls", "--single_class", default=False, action="store_true", required=False,
                     help="Use only one class")
-parser.add_argument("--pretrained_weights", default=False, action="store_true", required=False,
+parser.add_argument("--coco_pretrained_weights", default=False, action="store_true", required=False,
                     help="Load model with pretrained weights from COCO dataset")
+parser.add_argument("--weights", type=str, required=False,
+                    help="Attach weights to the model")
 parser.add_argument('-conf', '--confidence_threshold', type=float, default=0.2, required=False,
                     help='Confidence threshold used to evaluate model')
 parser.add_argument('-iou', '--iou_threshold', type=float, default=0.2, required=False,
@@ -337,7 +361,7 @@ if __name__ == "__main__":
     class_mapping = train_dataset.class_mapping
 
     model = create_retinanet_model(num_classes=len(class_mapping),
-                                   use_pretrained_weights=args.pretrained_weights,
+                                   use_COCO_pretrained_weights=args.coco_pretrained_weights,
                                    score_threshold=args.confidence_threshold,
                                    iou_threshold=args.iou_threshold,
                                    unfrozen_layers=args.unfreeze,
@@ -381,14 +405,14 @@ if __name__ == "__main__":
         'single_class': SINGLE_CLS,
         'optimizer': args.optimizer,
         'weight_decay': args.weight_decay,
-        'pretrained_weights': args.pretrained_weights,
+        'COCO_pretrained_weights': args.coco_pretrained_weights,
         'num_workers': args.num_workers,
         'lr_scheduler_step_size': args.lr_step_size,
         'lr_scheduler_gamma': args.lr_gamma,
         'loss_weight_regression': configs['loss']['bbox_regression'],
         'loss_weight_classification': configs['loss']['classification'],
-        'normalization_mean': model.transform.image_mean,
-        'normalization_std': model.transform.image_std,
+        'normalization_mean': [round(i, 4) for i in model.transform.image_mean],
+        'normalization_std': [round(i, 4) for i in model.transform.image_std],
         'unfrozen_backbone_layers': args.unfreeze,
         'used_GPU': torch.cuda.get_device_name(),
         'patience': args.patience,
