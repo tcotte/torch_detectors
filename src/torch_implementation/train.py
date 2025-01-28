@@ -14,7 +14,7 @@ from tqdm import tqdm
 from src.torch_implementation.dataset import PascalVOCDataset
 from src.torch_implementation.eval import plot_precision_recall_curve
 from src.torch_implementation.loggers.picsellia_logger import PicselliaLogger
-from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
+from src.torch_implementation.model_retinanet import collate_fn, build_retinanet_model
 from src.torch_implementation.utils import Averager, apply_postprocess_on_predictions, EarlyStopper, apply_loss_weights, \
     read_configuration_file, get_GPU_occupancy
 
@@ -25,9 +25,9 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
     def _on_end_training():
         torch.save(model.state_dict(), os.path.join(path_saved_models, 'latest.pth'))
 
-        precision_recall_curve = plot_precision_recall_curve(validation_metrics=validation_metrics,
-                                                             recall_thresholds=torch.linspace(0.0, 1.00, round(
-                                                                 1.00 / 0.01) + 1).tolist())
+        precision_recall_curve = plot_precision_recall_curve(
+            validation_metrics=validation_metrics,
+            recall_thresholds=torch.linspace(0.0, 1.00, round(1.00 / 0.01) + 1).tolist())
 
         output_dir = f'../../{picsellia_logger.get_experiment_id()}'
         os.makedirs(output_dir, exist_ok=True)
@@ -132,7 +132,6 @@ def train_model(model, optimizer, train_data_loader, val_data_loader, lr_schedul
             # send targets to GPU
             targets_gpu = []
             for j in range(len(targets)):
-
                 targets_gpu.append({k: v.to(device=device, non_blocking=True) for k, v in targets[j].items()})
 
             metric.update(processed_predictions, targets_gpu)
@@ -195,10 +194,10 @@ parser.add_argument('-device', '--device', type=str, default="cuda", required=Fa
                     help='Device used to train the model')
 parser.add_argument('-lr', '--learning_rate', type=float, default=0.001, required=False,
                     help='Initial learning rate used for training')
-parser.add_argument('--lr_step_size', type=int, default=50, required=False,
-                    help='Period of learning rate decay')
-parser.add_argument('--lr_gamma', type=float, default=0.1, required=False,
-                    help='Multiplicative factor of learning rate decay')
+# parser.add_argument('--lr_step_size', type=int, default=50, required=False,
+#                     help='Period of learning rate decay')
+# parser.add_argument('--lr_gamma', type=float, default=0.1, required=False,
+#                     help='Multiplicative factor of learning rate decay')
 parser.add_argument('-wd', '--weight_decay', type=float, default=0.0005, required=False,
                     help='Weight decay used for training')
 parser.add_argument('-env', '--path_env_file', type=str, required=True,
@@ -213,7 +212,7 @@ parser.add_argument('-numw', '--num_workers', type=int, default=8, required=Fals
                     help='Number of workers to retrieve data during training')
 parser.add_argument('-imgsz', '--image_size', nargs='+', type=int,
                     help='Training image size')
-parser.add_argument("-sglcls", "--single_class", default=False, action="store_true", required=False,
+parser.add_argument("-sglcls", "--single_cls", default=False, action="store_true", required=False,
                     help="Use only one class")
 parser.add_argument("--coco_pretrained_weights", default=False, action="store_true", required=False,
                     help="Load model with pretrained weights from COCO dataset")
@@ -360,19 +359,18 @@ if __name__ == "__main__":
     # TODO concatenate class mappings of train and test datasets
     class_mapping = train_dataset.class_mapping
 
-    model = create_retinanet_model(num_classes=len(class_mapping),
-                                   use_COCO_pretrained_weights=args.coco_pretrained_weights,
-                                   score_threshold=args.confidence_threshold,
-                                   iou_threshold=args.iou_threshold,
-                                   unfrozen_layers=args.unfreeze,
-                                   mean_values=configs['augmentations']['normalization']['mean'],
-                                   std_values=configs['augmentations']['normalization']['std']
-                                   )
+    model = build_retinanet_model(num_classes=len(class_mapping),
+                                  use_COCO_pretrained_weights=args.coco_pretrained_weights,
+                                  score_threshold=args.confidence_threshold,
+                                  iou_threshold=args.iou_threshold,
+                                  unfrozen_layers=args.unfreeze,
+                                  mean_values=configs['augmentations']['normalization']['mean'],
+                                  std_values=configs['augmentations']['normalization']['std']
+                                  )
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     model.to(device)
-    params = [p for p in model.parameters() if p.requires_grad]
 
     if args.optimizer.lower() == 'sgd':
         optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=args.weight_decay)
@@ -402,7 +400,7 @@ if __name__ == "__main__":
         'learning_rate': LEARNING_RATE,
         'num_epochs': NB_EPOCHS,
         'nb_classes': len(class_mapping),
-        'single_class': SINGLE_CLS,
+        'single_cls': SINGLE_CLS,
         'optimizer': args.optimizer,
         'weight_decay': args.weight_decay,
         'COCO_pretrained_weights': args.coco_pretrained_weights,

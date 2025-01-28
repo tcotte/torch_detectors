@@ -55,11 +55,11 @@ TODO:
 - Ré-essayer la normalization avec les params calculés en mode 'custom dataset'
 - Transform model to ONNX
 - Try grid evaluation with SGD (-> different learning rates)
-- Import custom torch weights
+- [DONE]Import custom torch weights
 - Import backbone weights
-- Include mosaic and ...
+- Include mosaic and other augmentations from YOLO
 
-- Display precision_recall curve
+- [DONE]Display precision_recall curve
 - [test]Print available space on CUDA
 - [test]Import existing weights 
 - Création evaluation experiment picsellia

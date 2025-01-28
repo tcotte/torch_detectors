@@ -171,52 +171,81 @@ class PascalVOCDataset(Dataset):
 
         return images, boxes, labels
 
-if __name__ == '__main__':
-    DATA_VALIDATION_DIR = r'C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\dataset\test'
-    IMAGE_SIZE = (1024, 1024)
-    SINGLE_CLS = True
 
-    train_transform = A.Compose([
-        # A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
-        #             std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
-        #             max_pixel_value= 207),
-        A.RandomCrop(*IMAGE_SIZE),
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.OneOf([
-            A.GaussNoise(std_range=(0.2, 0.44), mean_range = (0.0, 0.0), per_channel = True, noise_scale_factor = 1, p = 0.5),
-            A.GridDropout(
-                ratio=0.1,
-                unit_size_range=None,
-                random_offset=True,
-                p=0.2),
-        ]),
-        A.ColorJitter(brightness=(0.9, 1.1), contrast=(0.9, 1.1), saturation=(0.9, 1.1), hue=(-0.2, 0.2), p=0.5),
-        A.OneOf([
-            A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.5),
-            A.HueSaturationValue(p=0.1),
-            A.RandomBrightnessContrast(p=0.2),
-        ]),
-        A.OneOf([
-            A.ElasticTransform(alpha=1, sigma=50, interpolation=1, approximate=False, same_dxdy=False,
-                             mask_interpolation=0, noise_distribution='gaussian', p=0.2),
-            A.GridDistortion (num_steps=5, distort_limit=(-0.3, 0.3), interpolation=1, normalized=True,
-                              mask_interpolation=0, p=0.3)
-        ]),
-        A.RandomScale(scale_limit=(-0.3, 0.3), interpolation=1, mask_interpolation=0, p=0.5),
+class PascalVOCTestDataset(Dataset):
+    """
+    A PyTorch Dataset class to be used in a PyTorch DataLoader to create batches.
+    """
 
-        ToTensorV2()
-    ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
+    def __init__(self, image_folder, transform=None):
+        """
+        :param image_folder: folder where images are stored
+        """
+        self.images = list(imutils.paths.list_images(image_folder))
+        self.transform = transform
 
-    val_dataset = PascalVOCDataset(
-        data_folder=DATA_VALIDATION_DIR,
-        split='test',
-        single_cls=SINGLE_CLS,
-        transform=train_transform)
+    def __getitem__(self, i):
+        # Read image
+        file_path = self.images[i]
+        image = Image.open(file_path, mode='r')
+        image = image.convert('RGB')
 
-    # for i in val_dataset[:8]:
-    # print(val_dataset[0][0])
-    for i in range(10):
+        # Apply transformations
+        transformed = self.transform(image=np.array(image))
 
-        plt.imshow(torch.permute(val_dataset[i][0], (2, 1, 0)).numpy())
-        plt.show()
+        image = transformed['image'] / 225.
+
+        return image, os.path.basename(file_path)
+
+    def __len__(self):
+        return len(self.images)
+
+
+# if __name__ == '__main__':
+#     DATA_VALIDATION_DIR = r'C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\dataset\test'
+#     IMAGE_SIZE = (1024, 1024)
+#     SINGLE_CLS = True
+#
+#     train_transform = A.Compose([
+#         # A.Normalize(mean=[0.9629258011853685, 1.1043921727662964, 0.9835339608076883],
+#         #             std=[0.08148765554920795, 0.10545005065566, 0.13757230267160245],
+#         #             max_pixel_value= 207),
+#         A.RandomCrop(*IMAGE_SIZE),
+#         A.HorizontalFlip(p=0.5),
+#         A.VerticalFlip(p=0.5),
+#         A.OneOf([
+#             A.GaussNoise(std_range=(0.2, 0.44), mean_range=(0.0, 0.0), per_channel=True, noise_scale_factor=1, p=0.5),
+#             A.GridDropout(
+#                 ratio=0.1,
+#                 unit_size_range=None,
+#                 random_offset=True,
+#                 p=0.2),
+#         ]),
+#         A.ColorJitter(brightness=(0.9, 1.1), contrast=(0.9, 1.1), saturation=(0.9, 1.1), hue=(-0.2, 0.2), p=0.5),
+#         A.OneOf([
+#             A.CLAHE(clip_limit=4.0, tile_grid_size=(8, 8), p=0.5),
+#             A.HueSaturationValue(p=0.1),
+#             A.RandomBrightnessContrast(p=0.2),
+#         ]),
+#         A.OneOf([
+#             A.ElasticTransform(alpha=1, sigma=50, interpolation=1, approximate=False, same_dxdy=False,
+#                                mask_interpolation=0, noise_distribution='gaussian', p=0.2),
+#             A.GridDistortion(num_steps=5, distort_limit=(-0.3, 0.3), interpolation=1, normalized=True,
+#                              mask_interpolation=0, p=0.3)
+#         ]),
+#         A.RandomScale(scale_limit=(-0.3, 0.3), interpolation=1, mask_interpolation=0, p=0.5),
+#
+#         ToTensorV2()
+#     ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels'], min_visibility=0.5))
+#
+#     val_dataset = PascalVOCDataset(
+#         data_folder=DATA_VALIDATION_DIR,
+#         split='test',
+#         single_cls=SINGLE_CLS,
+#         transform=train_transform)
+#
+#     # for i in val_dataset[:8]:
+#     # print(val_dataset[0][0])
+#     for i in range(10):
+#         plt.imshow(torch.permute(val_dataset[i][0], (2, 1, 0)).numpy())
+#         plt.show()

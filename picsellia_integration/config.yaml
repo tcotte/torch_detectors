@@ -7,10 +7,6 @@ learning_rate:
     last_step: 5
     warmup_period: 2
 
-  decay:
-    step_size: 50
-    gamma: 0.5
-
 augmentations:
   normalization:
     mean: [0.9629258011853685, 1.1043921727662964, 0.9835339608076883]

@@ -18,7 +18,7 @@ from sahi.utils.cv import read_image
 from PIL import Image
 
 from src.torch_implementation.dataset import PascalVOCDataset
-from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
+from src.torch_implementation.model_retinanet import collate_fn, build_retinanet_model
 from src.torch_implementation.utils import UnNormalize, apply_postprocess_on_predictions
 
 class_mapping = {
@@ -57,14 +57,14 @@ MIN_IOU_THRESHOLD = 0.01
 
 
 # model = create_faster_rcnn_model(num_classes=2)
-model = create_retinanet_model(num_classes=len(class_mapping),
-                               use_COCO_pretrained_weights=True,
-                               score_threshold=MIN_IOU_THRESHOLD,
-                               iou_threshold=MIN_CONFIDENCE,
-                               unfrozen_layers=3,
-                               mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
-                               std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
-                               )
+model = build_retinanet_model(num_classes=len(class_mapping),
+                              use_COCO_pretrained_weights=True,
+                              score_threshold=MIN_IOU_THRESHOLD,
+                              iou_threshold=MIN_CONFIDENCE,
+                              unfrozen_layers=3,
+                              mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
+                              std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
+                              )
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # device = torch.device('cpu')

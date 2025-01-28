@@ -8,7 +8,7 @@ from albumentations.pytorch import ToTensorV2
 
 from ONNX_tests.export_ONNX_format import IMAGE_SIZE, class_mapping, MIN_IOU_THRESHOLD, MIN_CONFIDENCE
 from src.torch_implementation.dataset import PascalVOCDataset
-from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
+from src.torch_implementation.model_retinanet import collate_fn, build_retinanet_model
 
 '''
 We have to get a coherent set of libraries (Pytorch / CUDNN / onnxruntime) to run ONNX with CUDA:
@@ -76,15 +76,16 @@ if __name__ == '__main__':
     os.environ['CUDA_CACHE_DISABLE'] = '0'
     # torch._C._jit_set_profiling_mode(False)  # Fixes initial delay
 
-    retinanet = create_retinanet_model(num_classes=len(class_mapping),
-                                       use_COCO_pretrained_weights=True,
-                                       score_threshold=MIN_IOU_THRESHOLD,
-                                       iou_threshold=MIN_CONFIDENCE,
-                                       unfrozen_layers=3,
-                                       mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
-                                       std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
-                                       )
+    retinanet = build_retinanet_model(num_classes=len(class_mapping),
+                                      use_COCO_pretrained_weights=True,
+                                      score_threshold=MIN_IOU_THRESHOLD,
+                                      iou_threshold=MIN_CONFIDENCE,
+                                      unfrozen_layers=3,
+                                      mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
+                                      std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
+                                      )
     retinanet.eval()
+    retinanet.cuda()
 
     providers = ["CUDAExecutionProvider"]
     sess_options = ort.SessionOptions()
@@ -105,6 +106,8 @@ if __name__ == '__main__':
         ort_inputs = {sess.get_inputs()[0].name: to_numpy(x)}
         ort_outs = sess.run(None, ort_inputs)
         print(f"Time taken to run ONNX: {time.time() - start_prediction_onnx}")
+
+        x = x.cuda()
 
         start_prediction_torch = time.time()
         torch_out = retinanet(x)

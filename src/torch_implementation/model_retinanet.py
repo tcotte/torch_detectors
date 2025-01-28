@@ -8,7 +8,7 @@ from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.models.detection.retinanet import RetinaNetClassificationHead
 
 
-def create_retinanet_model(
+def build_retinanet_model(
         score_threshold: float,
         iou_threshold: float,
         max_det: int = 300,

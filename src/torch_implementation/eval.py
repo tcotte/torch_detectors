@@ -9,8 +9,8 @@ from torchmetrics.detection import MeanAveragePrecision
 from tqdm import tqdm
 
 from src.torch_implementation.dataset import PascalVOCDataset
-from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
-from src.torch_implementation.utils import apply_postprocess_on_predictions, get_GPU_occupancy
+from src.torch_implementation.model_retinanet import collate_fn, build_retinanet_model
+from src.torch_implementation.utils import get_GPU_occupancy
 
 
 def plot_precision_recall_curve(validation_metrics: dict, recall_thresholds: list[float]) -> plt.plot:
@@ -107,14 +107,14 @@ if __name__ == '__main__':
         collate_fn=collate_fn
     )
 
-    model = create_retinanet_model(num_classes=1,
-                                   use_COCO_pretrained_weights=False,
-                                   score_threshold=0.2,
-                                   iou_threshold=0.2,
-                                   trained_weights=r'C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\src\torch_implementation\models\best_normalization_custom_retinanet.pth',
-                                   mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
-                                   std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
-                                   )
+    model = build_retinanet_model(num_classes=1,
+                                  use_COCO_pretrained_weights=False,
+                                  score_threshold=0.2,
+                                  iou_threshold=0.2,
+                                  trained_weights=r'C:\Users\tristan_cotte\PycharmProjects\yolov8_keras\src\torch_implementation\models\best_normalization_custom_retinanet.pth',
+                                  mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
+                                  std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
+                                  )
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 

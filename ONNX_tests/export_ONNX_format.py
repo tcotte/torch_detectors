@@ -2,7 +2,7 @@ import os
 
 import torch
 
-from src.torch_implementation.model_retinanet import create_retinanet_model
+from src.torch_implementation.model_retinanet import build_retinanet_model
 
 
 
@@ -24,14 +24,14 @@ if __name__ == '__main__':
 
     # Load retinanet
     # pth_path = "/path/to/retinanet.pth"
-    retinanet = create_retinanet_model(num_classes=len(class_mapping),
-                                       use_COCO_pretrained_weights=True,
-                                       score_threshold=MIN_IOU_THRESHOLD,
-                                       iou_threshold=MIN_CONFIDENCE,
-                                       unfrozen_layers=3,
-                                       mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
-                                       std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
-                                       )
+    retinanet = build_retinanet_model(num_classes=len(class_mapping),
+                                      use_COCO_pretrained_weights=True,
+                                      score_threshold=MIN_IOU_THRESHOLD,
+                                      iou_threshold=MIN_CONFIDENCE,
+                                      unfrozen_layers=3,
+                                      mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
+                                      std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
+                                      )
 
     retinanet.eval()
     retinanet.cuda()

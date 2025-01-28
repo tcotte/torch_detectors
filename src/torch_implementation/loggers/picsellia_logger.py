@@ -4,21 +4,29 @@ from datetime import datetime
 from typing import Union
 
 from dotenv import load_dotenv
-from picsellia import Client
+from picsellia import Client, Experiment
 from picsellia.types.enums import LogType, JobStatus, ExperimentStatus
 
 from src.torch_implementation.utils import get_GPU_occupancy
 
 
 class PicselliaLogger:
-    def __init__(self, path_env_file, create_new_experiment: bool = True, run_name: Union[str, None] = None):
+    def __init__(self, path_env_file: Union[str, None], create_new_experiment: bool = True, run_name: Union[str, None] = None):
         self._client: Union[None, Client] = None
         self._path_env_file = path_env_file
 
-        if not create_new_experiment:
-            self._experiment = self.get_picsellia_experiment()
-        else:
-            self.create_experiment(run_name=run_name)
+        if self._path_env_file is not None:
+            if not create_new_experiment:
+                self._experiment = self.get_picsellia_experiment()
+            else:
+                self.create_experiment(run_name=run_name)
+
+    @classmethod
+    def from_picsellia_client_and_experiment(cls, picsellia_experiment: Experiment, picsellia_client: Client):
+        cls_ = cls(path_env_file=None, create_new_experiment=False, run_name=None)
+        cls_._experiment = picsellia_experiment
+        cls_._client = picsellia_client
+        return cls_
 
     def get_picsellia_experiment_link(self):
         client_id = self._client.id
@@ -64,7 +72,7 @@ class PicselliaLogger:
         self._experiment.log(name=title, type=LogType.BAR, data=data)
 
     def on_train_begin(self, params, class_mapping):
-        self._experiment.log(name='Parameters', type=LogType.TABLE, data=params)
+        self._experiment.log(name='All parameters', type=LogType.TABLE, data=params)
         self._experiment.log(name='LabelMap', type=LogType.TABLE,
                              data={str(key): value for key, value in class_mapping.items()})
 

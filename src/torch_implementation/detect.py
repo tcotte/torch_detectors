@@ -9,7 +9,7 @@ from albumentations.pytorch import ToTensorV2
 from torchmetrics.detection import MeanAveragePrecision
 
 from src.torch_implementation.dataset import PascalVOCDataset
-from src.torch_implementation.model_retinanet import collate_fn, create_retinanet_model
+from src.torch_implementation.model_retinanet import collate_fn, build_retinanet_model
 from src.torch_implementation.utils import UnNormalize, apply_postprocess_on_predictions
 
 class_mapping = {
@@ -46,14 +46,14 @@ MIN_CONFIDENCE = 0.5
 MIN_IOU_THRESHOLD = 0.1
 
 # model = create_faster_rcnn_model(num_classes=2)
-model = create_retinanet_model(num_classes=len(class_mapping),
-                               use_COCO_pretrained_weights=True,
-                               score_threshold=MIN_IOU_THRESHOLD,
-                               iou_threshold=MIN_CONFIDENCE,
-                               unfrozen_layers=3,
-                               mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
-                               std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
-                               )
+model = build_retinanet_model(num_classes=len(class_mapping),
+                              use_COCO_pretrained_weights=True,
+                              score_threshold=MIN_IOU_THRESHOLD,
+                              iou_threshold=MIN_CONFIDENCE,
+                              unfrozen_layers=3,
+                              mean_values=(0.9629258011853685, 1.1043921727662964, 0.9835339608076883),
+                              std_values=(0.08148765554920795, 0.10545005065566, 0.13757230267160245)
+                              )
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # device = torch.device('cpu')
@@ -101,6 +101,7 @@ if __name__ == "__main__":
             img = img.detach().cpu().numpy()
             img = img.transpose(1, 2, 0)
 
+
             for bbox_target in targets[index]['boxes']:
                 bbox_target = bbox_target.detach().cpu().numpy()
                 cv2.rectangle(img, (int(bbox_target[0]), int(bbox_target[1])),
@@ -119,6 +120,8 @@ if __name__ == "__main__":
                             color=(0, 0, 255), thickness=1, fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5)
 
             plt.title(f'Image {index + i*BATCH_SIZE}')
+
+
             plt.imshow(img)
             plt.show()
 
