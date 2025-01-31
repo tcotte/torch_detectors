@@ -14,3 +14,4 @@ src/torch_implementation/models/
 src/tf_implementation/experiments/
 Output_SAHI/
 ONNX_tests/ONNX_models/
+picsellia_downloads/
